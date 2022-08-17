@@ -11,7 +11,7 @@ pub fn detect_xor(filename: &str) -> Result<String, ()> {
     let ciphers = io::lines_from_file(filename);
     let x = ciphers.iter()
         .map(|c| single_byte_xor_cipher(c))
-        .map(|(a, _, c)| (a, c))
+        .map(|deciphered_text| (deciphered_text.text, deciphered_text.score))
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal));
     match x {
         Some(v) => Ok(v.0),
@@ -19,7 +19,13 @@ pub fn detect_xor(filename: &str) -> Result<String, ()> {
     }
 }
 
-pub fn single_byte_xor_cipher(input: &str) -> (String, u8, i32) {
+pub struct DecipheredText {
+    text: String, 
+    key: u8,
+    score: i32,
+}
+
+pub fn single_byte_xor_cipher(input: &str) -> DecipheredText {
     let mut ans: String = "".to_string();
     let mut key: u8 = 0;
     let mut max = 0;
@@ -34,7 +40,12 @@ pub fn single_byte_xor_cipher(input: &str) -> (String, u8, i32) {
             key = k;
         }
     }
-    (ans, key, max)
+
+    DecipheredText {
+        text: ans, 
+        key: key, 
+        score: max 
+    }
 }
 
 
@@ -73,9 +84,9 @@ mod tests {
  #[test]
  fn single_byte_xor() {
     let input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
-    let (ans, key, _) = single_byte_xor_cipher(input);
-    assert_eq!(ans, "Cooking MC's like a pound of bacon");
-    assert_eq!(key, 88);
+    let deciphered_text = single_byte_xor_cipher(input);
+    assert_eq!(deciphered_text.text, "Cooking MC's like a pound of bacon");
+    assert_eq!(deciphered_text.key, 88);
  }
 
  #[test]
