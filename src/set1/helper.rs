@@ -1,35 +1,4 @@
-use std::error::Error;
-use std::fmt;
-
-
-#[derive(Debug)]
-pub struct HammingDistanceParsingError {
-    details: String
-}
-
-impl HammingDistanceParsingError {
-    fn new(msg: &str) -> Self {
-        Self{details: msg.to_string()}
-    }
-}
-
-impl fmt::Display for HammingDistanceParsingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"{}",self.details)
-    }
-}
-
-impl Error for HammingDistanceParsingError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
-impl PartialEq for HammingDistanceParsingError {
-    fn eq(&self, other: &Self) -> bool {
-        self.details == other.details
-    }
-}
+use crate::set1::error::HammingDistanceParsingError;
 
 pub fn hamming_distance(string1: &str, string2: &str) -> Result<u32, HammingDistanceParsingError> {
     let bytes1 = string1.as_bytes();
