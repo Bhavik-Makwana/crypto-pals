@@ -6,6 +6,17 @@ pub mod io;
 extern crate base64;
 extern crate hex;
 
+// challenge 5
+pub fn repeating_key_xor(filename: &str, key: &str) -> String {
+    let lines = io::read_file(filename);
+    let lines_bytes = lines.as_bytes();
+    let repeating_key: String = key.to_string().chars().cycle().take(lines_bytes.len()).collect();
+    let key_bytes = repeating_key.as_bytes();
+    let xor_value: Vec<u8> = lines_bytes.iter().zip(key_bytes.iter()).map(|(a, b)| a ^ b).collect();
+
+    hex::encode(xor_value)
+}
+
 // challenge 4
 pub fn detect_xor(filename: &str) -> Result<String, ()> {
     let ciphers = io::lines_from_file(filename);
@@ -25,18 +36,19 @@ pub struct DecipheredText {
     score: i32,
 }
 
+// Challenge 3
 pub fn single_byte_xor_cipher(input: &str) -> DecipheredText {
     let mut ans: String = "".to_string();
     let mut key: u8 = 0;
     let mut max = 0;
     for k in 0..=255 {
-        let s = scorer::single_byte_xor(input, k as u8);
-        let p = &hex::decode(s).unwrap();
-        let msg = String::from(String::from_utf8_lossy(p));
-        let current_score = msg.chars().map(|c| scorer::score(c)).sum();
+        let xor_text = scorer::single_byte_xor(input, k as u8);
+        let deciphered_text_bytes = &hex::decode(xor_text).unwrap();
+        let deciphered_text = String::from(String::from_utf8_lossy(deciphered_text_bytes));
+        let current_score = deciphered_text.chars().map(|c| scorer::score(c)).sum();
         if current_score > max {
             max = current_score;
-            ans = msg;
+            ans = deciphered_text;
             key = k;
         }
     }
@@ -48,11 +60,12 @@ pub fn single_byte_xor_cipher(input: &str) -> DecipheredText {
     }
 }
 
-
+// Challenge 1
 pub fn hex_to_base64(input: String) -> String {
     base64::encode(hex::decode(input).unwrap())
 }
 
+// Challenge 2
 pub fn xor(buf1: String, buf2: String) -> String {
     let decoded1 = hex::decode(buf1).unwrap();
     let decoded2 = hex::decode(buf2).unwrap();
@@ -94,5 +107,13 @@ mod tests {
     let filename = "input/set1_challenge4.txt";
     let ans = detect_xor(filename);
     assert_eq!(ans, Ok("Now that the party is jumping\n".to_string()));
+ }
+
+ #[test]
+ fn challenge_five() {
+    let filename = "input/set1_challenge5.txt";
+    let ans = repeating_key_xor(filename, "ICE");
+    let expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f".to_string();
+    assert_eq!(ans, expected);
  }
 }
