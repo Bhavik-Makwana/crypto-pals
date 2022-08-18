@@ -4,8 +4,10 @@ use std::{
     path::Path,
 };
 
+type FileStringVecOutput = Vec<String>;
+type FileStringBlockOutput = String;
 
-pub fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
+pub fn lines_from_file(filename: impl AsRef<Path>) -> FileStringVecOutput {
     let file = File::open(filename).expect("no such file");
     let buf = BufReader::new(file);
     buf.lines()
@@ -13,7 +15,9 @@ pub fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
         .collect()
 }
 
-pub fn read_file(filename: &str) -> String {
+
+
+pub fn read_file(filename: &str) -> FileStringBlockOutput {
     let mut file = File::open(filename).expect("no such file");
     let mut contents = String::new();
     file.read_to_string(&mut contents).expect("to work");

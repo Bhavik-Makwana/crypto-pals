@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 pub mod scorer;
 pub mod io;
+pub mod helper;
 
 extern crate base64;
 extern crate hex;
