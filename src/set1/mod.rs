@@ -1,10 +1,9 @@
-use std::cmp::Ordering;
-
 pub mod error;
 pub mod helper;
 pub mod io;
+pub mod pair;
 pub mod scorer;
-
+use std::cmp::Ordering;
 extern crate base64;
 extern crate hex;
 
