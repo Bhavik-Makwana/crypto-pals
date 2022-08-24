@@ -1,6 +1,6 @@
 extern crate base64;
-use crate::set1::error::HammingDistanceParsingError;
-use crate::set1::pair::KeyAndEditDistPair;
+use crate::errors::hamming_distance_error::HammingDistanceParsingError;
+use crate::set1::types::KeyAndEditDistPair;
 use core::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;

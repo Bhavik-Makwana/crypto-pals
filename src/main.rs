@@ -1,5 +1,7 @@
+mod errors;
 mod set1;
 
+use crate::errors::*;
 use crate::set1::*;
 
 fn main() {
