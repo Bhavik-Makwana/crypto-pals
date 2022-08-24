@@ -1,6 +1,6 @@
 extern crate base64;
-
 use crate::set1::error::HammingDistanceParsingError;
+use core::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
@@ -66,27 +66,43 @@ pub fn smallest_key(bytes: &[u8]) -> u32 {
    key_sz as u32
 }
 
+#[derive(PartialEq)]
+struct Pair {
+   key: usize,
+   edit_dist: f64,
+}
+
+impl PartialOrd for Pair {
+   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+      other.edit_dist.partial_cmp(&self.edit_dist)
+   }
+}
+
+impl Ord for Pair {
+   fn cmp(&self, other: &Pair) -> Ordering {
+      self.partial_cmp(other).unwrap()
+   }
+}
+
+impl Eq for Pair {}
+
 pub fn smallest_three_keys(input: &str) -> Vec<u32> {
    let bytes = base64::decode(input).unwrap();
-   // let mut heap = BinaryHeap::new();
-   let mut heap = vec![];
+   let mut heap = BinaryHeap::new();
+   // let mut heap = vec![];
    for i in 2..=40 {
-      // heap.push((Reverse(normalised_edit_distance(&bytes, i)), i));
-      heap.push((normalised_edit_distance(&bytes, i), i));
-      // heap.push((calc_avg_edit_dist(i, &bytes), i));
+      let pair = Pair {
+         key: i,
+         edit_dist: normalised_edit_distance(&bytes, i).unwrap(),
+      };
+      heap.push(pair);
    }
-   heap.sort_by(|x, y| y.1.partial_cmp(&x.1).unwrap());
-   let key_sz = heap.pop().and_then(|x| Some(x.0)).unwrap();
-   vec![key_sz.unwrap() as u32]
-   // heap
-   //    .into_sorted_vec()
-   //    .iter()
-   //    .take(3)
-   //    // .map(|x| x.0.clone().0.unwrap())
-   //    .map(|x| x.1 as u32)
-   //    .collect::<Vec<_>>()
-   // heap.sort_by_key(|x| x.0.clone().unwrap());
-   // heap.iter().take(3).map(|x| x.1 as u32).collect::<Vec<_>>()
+   heap
+      .into_sorted_vec()
+      .iter()
+      .take(3)
+      .map(|x| x.key as u32)
+      .collect::<Vec<_>>()
 }
 
 pub fn blocks(input: &[u8], keysize: usize) -> Vec<Vec<u8>> {
