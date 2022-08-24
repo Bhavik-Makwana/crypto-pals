@@ -2,6 +2,17 @@ extern crate base64;
 use crate::errors::hamming_distance_error::HammingDistanceParsingError;
 use crate::set1::types::KeyAndEditDistPair;
 use std::collections::BinaryHeap;
+use std::collections::HashSet;
+
+pub fn count_repeating_blocks(ciphertext: &[u8]) -> u32 {
+   if ciphertext.len() % 16 != 0 {
+      return 0;
+   }
+
+   let chunks = ciphertext.chunks(16);
+   let unique_chunks: HashSet<&[u8]> = HashSet::from_iter(ciphertext.chunks(16));
+   (chunks.len() - unique_chunks.len()) as u32
+}
 
 pub fn hamming_distance(string1: &str, string2: &str) -> Result<u32, HammingDistanceParsingError> {
    let bytes1 = string1.as_bytes();

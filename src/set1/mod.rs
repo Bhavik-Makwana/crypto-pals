@@ -12,6 +12,28 @@ use crate::set1::aes::cipher::{BlockDecrypt, KeyInit};
 use aes::cipher::generic_array::GenericArray;
 use aes::Aes128;
 
+// challenge 8
+pub fn detect_ecb(filename: &str) -> (u32, String, usize) {
+    let lines = io::lines_from_file(filename);
+    let mut max = (0, "".to_string(), 0);
+    // slow af
+    // lines
+    //     .iter()
+    //     .enumerate()
+    //     .map(|(i, line)| hex::decode(line).unwrap())
+    //     .max_by_key(|b| helper::count_repeating_blocks(b))
+    //     .unwrap()
+
+    lines.iter().map(|line| hex::decode(line).unwrap());
+    for (i, line) in lines.iter().enumerate() {
+        let cnt = helper::count_repeating_blocks(line.as_bytes());
+        if cnt > max.0 {
+            max = (cnt, line.to_string(), i);
+        }
+    }
+    return max;
+}
+
 // challenge 7
 pub fn aes_ecb(filename: &str, key: &str) -> String {
     let lines = io::read_file_no_newline(filename);
@@ -164,6 +186,7 @@ pub fn hex_to_base64(input: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test::Bencher;
     #[test]
     fn converts_hex_to_base64() {
         let input = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d".to_string();
@@ -212,5 +235,17 @@ mod tests {
             aes_ecb(string, key),
             "test\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}"
         );
+    }
+
+    #[test]
+    fn challenge_eight() {
+        let string = "input/set1_challenge8.txt";
+        assert_eq!(detect_ecb(string).2, 132);
+    }
+
+    #[bench]
+    fn challenge_eight_bench(b: &mut Bencher) {
+        let string = "input/set1_challenge8.txt";
+        b.iter(|| detect_ecb(string));
     }
 }
