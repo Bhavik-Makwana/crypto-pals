@@ -9,31 +9,29 @@ extern crate hex;
 
 pub fn challenge_six(filename: &str) -> Vec<String> {
     let lines = io::read_file_no_newline(filename);
-    let bytes = base64::decode(lines.clone()).unwrap();
+    let bytes = base64::decode(lines).unwrap();
+    let keys = helper::smallest_n_keys(&bytes, 3);
+    // println!("KEY SIZES {:?}", keys);
 
-    // let keys = helper::smallest_three_keys(&lines);
-    let keys = vec![helper::smallest_key(&bytes)];
-    println!("KEY SIZES {:?}", keys);
     let mut res: Vec<_> = vec![];
     for k in keys.iter() {
         let blocks = helper::blocks(&bytes, *k as usize);
-        // let transpose = transpose::transpose(blocks);
-        println!("{} {} ", blocks.len(), blocks[0].len());
+        // println!("{} {} ", blocks.len(), blocks[0].len());
         let transpose = helper::transpose(blocks);
         res.push(
             transpose
                 .iter()
-                .map(|block| single_byte_xor_cipher_bytes(block.clone()).key)
+                .map(|block| single_byte_xor_cipher_bytes(block).key)
                 .collect::<Vec<u8>>(),
         );
     }
     // println!("{:?}", res);
-    let mut t: Vec<String> = vec![];
+    let mut potential_keys: Vec<String> = vec![];
     for i in res.iter() {
         let key = i.iter().map(|&b| b as char).collect();
-        t.push(key);
+        potential_keys.push(key);
     }
-    t
+    potential_keys
 }
 
 // challenge 5
@@ -100,12 +98,12 @@ pub fn single_byte_xor_cipher(input: &str) -> DecipheredText {
     }
 }
 
-pub fn single_byte_xor_cipher_bytes(input: Vec<u8>) -> DecipheredText {
+pub fn single_byte_xor_cipher_bytes(input: &Vec<u8>) -> DecipheredText {
     let mut ans: String = "".to_string();
     let mut key: u8 = 0;
     let mut max = 0;
     for k in 0..=255 {
-        let xor_text = scorer::single_byte_xor_bytes(input.clone(), k as u8);
+        let xor_text = scorer::single_byte_xor_bytes(input, k as u8);
         // let deciphered_text_bytes = &hex::decode(xor_text).unwrap();
         let deciphered_text = String::from(String::from_utf8_lossy(&xor_text));
         let current_score = deciphered_text.chars().map(|c| scorer::score(c)).sum();

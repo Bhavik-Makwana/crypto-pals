@@ -94,7 +94,7 @@ pub fn single_byte_xor(input: &str, key: u8) -> String {
     hex::encode(xor_bytes)
 }
 
-pub fn single_byte_xor_bytes(input: Vec<u8>, key: u8) -> Vec<u8> {
+pub fn single_byte_xor_bytes(input: &Vec<u8>, key: u8) -> Vec<u8> {
     input.iter().map(|&c| c ^ key).collect()
 }
 

@@ -33,9 +33,13 @@ pub fn hamming_distance_bytes(
       .fold(0, |acc, (b1, b2)| acc + (*b1 ^ *b2).count_ones() as u32))
 }
 
-pub fn normalised_edit_distance(bytes: &[u8], keysize: usize) -> Result<f64, String> {
-   let mut first_bytes; // = &bytes[0..keysize];
-   let mut second_bytes; // = &bytes[keysize..keysize * 2];
+// dont understand this yet
+pub fn normalised_edit_distance(
+   bytes: &[u8],
+   keysize: usize,
+) -> Result<f64, HammingDistanceParsingError> {
+   let mut first_bytes;
+   let mut second_bytes;
    let len = bytes.len();
    let mut i: usize = 0;
    let mut dist_sum: f64 = 0.0;
@@ -47,30 +51,15 @@ pub fn normalised_edit_distance(bytes: &[u8], keysize: usize) -> Result<f64, Str
       second_bytes = &bytes[(i + 1) * keysize..(i + 2) * keysize];
       match hamming_distance_bytes(first_bytes, second_bytes) {
          Ok(result) => dist_sum += result as f64 / keysize as f64,
-         Err(_) => break,
+         Err(e) => return Err(e),
       }
       i += 1;
    }
    Ok((dist_sum as f64) / (i as f64 + 1.0))
 }
 
-pub fn smallest_key(bytes: &[u8]) -> u32 {
-   let mut heap = vec![];
-   for i in 2..=40 {
-      // heap.push((Reverse(normalised_edit_distance(&bytes, i)), i));
-      heap.push((normalised_edit_distance(&bytes, i), i));
-   }
-   heap.sort_by(|x, y| y.0.partial_cmp(&x.0).unwrap());
-   println!("{:?}", heap);
-   let key_sz = heap.pop().and_then(|x| Some(x.1)).unwrap();
-   println!("{:?}", key_sz);
-   key_sz as u32
-}
-
-pub fn smallest_three_keys(input: &str) -> Vec<u32> {
-   let bytes = base64::decode(input).unwrap();
+pub fn smallest_n_keys(bytes: &[u8], num_of_keys: usize) -> Vec<u32> {
    let mut heap = BinaryHeap::new();
-   // let mut heap = vec![];
    for i in 2..=40 {
       let pair = KeyAndEditDistPair {
          key: i,
@@ -79,9 +68,8 @@ pub fn smallest_three_keys(input: &str) -> Vec<u32> {
       heap.push(pair);
    }
    heap
-      .into_sorted_vec()
       .iter()
-      .take(3)
+      .take(num_of_keys)
       .map(|x| x.key as u32)
       .collect::<Vec<_>>()
 }
@@ -91,17 +79,17 @@ pub fn blocks(input: &[u8], keysize: usize) -> Vec<Vec<u8>> {
    x
 }
 
-pub fn transpose<T>(m: Vec<Vec<T>>) -> Vec<Vec<T>>
+pub fn transpose<T>(matrix: Vec<Vec<T>>) -> Vec<Vec<T>>
 where
    T: Clone + Copy + std::fmt::Debug,
 {
-   let mut t = vec![Vec::with_capacity(m.len()); m[0].len()];
-   for r in m {
+   let mut transposed_matrix = vec![Vec::with_capacity(matrix.len()); matrix[0].len()];
+   for r in matrix {
       for i in 0..r.len() {
-         t[i].push(r[i]);
+         transposed_matrix[i].push(r[i]);
       }
    }
-   t
+   transposed_matrix
 }
 
 #[cfg(test)]
@@ -116,21 +104,15 @@ mod tests {
    }
 
    #[test]
-   fn smallest_three_keys_12_12_12() {
-      let string = base64::encode("thithi gonna be normalisedthithi gonna be normalisedthithi gonna be normalisedthithi gonna be normalisedthithi gonna be normalisedthithi gonna be normalised");
-      assert_eq!(smallest_three_keys(&string), vec![2]);
-   }
-
-   #[test]
    fn blocks_test() {
-      let string = base64::encode("testdabc");
+      let string = base64::encode("test");
       let bytes = base64::decode(string).unwrap();
       assert_eq!(blocks(&bytes, 2), vec![vec![116, 101], vec![115, 116]]);
    }
 
    #[test]
    fn transpose_test() {
-      let string = base64::encode("testdabc");
+      let string = base64::encode("test");
       let bytes = base64::decode(string).unwrap();
       assert_eq!(
          transpose(blocks(&bytes, 2)),
