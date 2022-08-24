@@ -2,5 +2,8 @@ mod errors;
 mod set1;
 
 fn main() {
-    println!("{:?}", set1::challenge_six("input/set1_challenge6.txt"));
+    println!(
+        "msg: {:?}",
+        set1::aes_ecb("input/set1_challenge7.txt", "YELLOW SUBMARINE")
+    );
 }

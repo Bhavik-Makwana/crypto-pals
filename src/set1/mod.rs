@@ -4,10 +4,33 @@ pub mod scorer;
 pub mod types;
 use crate::set1::types::DecipheredText;
 use std::cmp::Ordering;
+extern crate aes;
 extern crate base64;
 extern crate hex;
 
-pub fn challenge_six(filename: &str) -> Vec<String> {
+use crate::set1::aes::cipher::{BlockDecrypt, KeyInit};
+use aes::cipher::generic_array::GenericArray;
+use aes::Aes128;
+
+// challenge 7
+pub fn aes_ecb(filename: &str, key: &str) -> String {
+    let lines = io::read_file_no_newline(filename);
+    let bytes = base64::decode(lines).unwrap();
+    let key_bytes = GenericArray::from_slice(key.as_bytes());
+
+    let mut blocks = Vec::new();
+    (0..bytes.len()).step_by(16).for_each(|block_len| {
+        blocks.push(GenericArray::clone_from_slice(
+            &bytes[block_len..block_len + 16],
+        ))
+    });
+    let cipher = Aes128::new(&key_bytes);
+    cipher.decrypt_blocks(&mut blocks);
+    blocks.iter().flatten().map(|&x| x as char).collect()
+}
+
+// challenge 6
+pub fn crack_veigenere_cipher(filename: &str) -> Vec<String> {
     let lines = io::read_file_no_newline(filename);
     let bytes = base64::decode(lines).unwrap();
     let keys = helper::smallest_n_keys(&bytes, 3);
@@ -179,5 +202,15 @@ mod tests {
         let ans = repeating_key_xor(filename, "ICE");
         let expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f".to_string();
         assert_eq!(ans, expected);
+    }
+
+    #[test]
+    fn challenge_seven() {
+        let string = "input/set1_challenge7_test.txt";
+        let key = "YELLOW SUBMARINE";
+        assert_eq!(
+            aes_ecb(string, key),
+            "test\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}"
+        );
     }
 }
