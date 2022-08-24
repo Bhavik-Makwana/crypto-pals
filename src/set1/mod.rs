@@ -2,6 +2,7 @@ pub mod helper;
 pub mod io;
 pub mod scorer;
 pub mod types;
+use crate::set1::types::DecipheredText;
 use std::cmp::Ordering;
 extern crate base64;
 extern crate hex;
@@ -34,6 +35,7 @@ pub fn challenge_six(filename: &str) -> Vec<String> {
 }
 
 // challenge 5
+#[allow(dead_code)]
 pub fn repeating_key_xor(filename: &str, key: &str) -> String {
     let lines = io::read_file(filename);
     let lines_bytes = lines.as_bytes();
@@ -54,6 +56,7 @@ pub fn repeating_key_xor(filename: &str, key: &str) -> String {
 }
 
 // challenge 4
+#[allow(dead_code)]
 pub fn detect_xor(filename: &str) -> Result<String, ()> {
     let ciphers = io::lines_from_file(filename);
     let x = ciphers
@@ -67,19 +70,13 @@ pub fn detect_xor(filename: &str) -> Result<String, ()> {
     }
 }
 
-pub struct DecipheredText {
-    text: String,
-    key: u8,
-    score: i32,
-}
-
 // Challenge 3
 pub fn single_byte_xor_cipher(input: &str) -> DecipheredText {
     let mut ans: String = "".to_string();
     let mut key: u8 = 0;
     let mut max = 0;
     for k in 0..=255 {
-        let xor_text = scorer::single_byte_xor(input, k as u8);
+        let xor_text = helper::single_byte_xor(input, k as u8);
         let deciphered_text_bytes = &hex::decode(xor_text).unwrap();
         let deciphered_text = String::from(String::from_utf8_lossy(deciphered_text_bytes));
         let current_score = deciphered_text.chars().map(|c| scorer::score(c)).sum();
@@ -97,12 +94,13 @@ pub fn single_byte_xor_cipher(input: &str) -> DecipheredText {
     }
 }
 
+#[allow(dead_code)]
 pub fn single_byte_xor_cipher_bytes(input: &Vec<u8>) -> DecipheredText {
     let mut ans: String = "".to_string();
     let mut key: u8 = 0;
     let mut max = 0;
     for k in 0..=255 {
-        let xor_text = scorer::single_byte_xor_bytes(input, k as u8);
+        let xor_text = helper::single_byte_xor_bytes(input, k as u8);
         // let deciphered_text_bytes = &hex::decode(xor_text).unwrap();
         let deciphered_text = String::from(String::from_utf8_lossy(&xor_text));
         let current_score = deciphered_text.chars().map(|c| scorer::score(c)).sum();
@@ -120,12 +118,8 @@ pub fn single_byte_xor_cipher_bytes(input: &Vec<u8>) -> DecipheredText {
     }
 }
 
-// Challenge 1
-pub fn hex_to_base64(input: String) -> String {
-    base64::encode(hex::decode(input).unwrap())
-}
-
 // Challenge 2
+#[allow(dead_code)]
 pub fn xor(buf1: String, buf2: String) -> String {
     let decoded1 = hex::decode(buf1).unwrap();
     let decoded2 = hex::decode(buf2).unwrap();
@@ -136,6 +130,12 @@ pub fn xor(buf1: String, buf2: String) -> String {
         .collect();
 
     hex::encode(xor_bytes)
+}
+
+// Challenge 1
+#[allow(dead_code)]
+pub fn hex_to_base64(input: String) -> String {
+    base64::encode(hex::decode(input).unwrap())
 }
 
 #[cfg(test)]

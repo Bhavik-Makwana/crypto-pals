@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+// use std::collections::HashMap;
 // very basic -- room for improvement
 // let scoring_values = HashMap::from([
 //     ('E', 10),
@@ -84,23 +84,4 @@ pub fn score(c: char) -> i32 {
         'z' => 11,
         _ => -10,
     }
-}
-
-pub fn single_byte_xor(input: &str, key: u8) -> String {
-    let decoded = hex::decode(input).unwrap();
-
-    let xor_bytes: Vec<u8> = decoded.iter().map(|&c| c ^ key).collect();
-
-    hex::encode(xor_bytes)
-}
-
-pub fn single_byte_xor_bytes(input: &Vec<u8>, key: u8) -> Vec<u8> {
-    input.iter().map(|&c| c ^ key).collect()
-}
-
-pub fn single_byte_xor_mut(input: &str, key: u8) -> String {
-    let decoded = hex::decode(input).unwrap();
-
-    let xor_bytes: Vec<u8> = decoded.iter().map(|&c| c ^ key).collect();
-    hex::encode(xor_bytes)
 }

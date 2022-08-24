@@ -1,8 +1,6 @@
 extern crate base64;
 use crate::errors::hamming_distance_error::HammingDistanceParsingError;
 use crate::set1::types::KeyAndEditDistPair;
-use core::cmp::Ordering;
-use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
 pub fn hamming_distance(string1: &str, string2: &str) -> Result<u32, HammingDistanceParsingError> {
@@ -33,7 +31,12 @@ pub fn hamming_distance_bytes(
       .fold(0, |acc, (b1, b2)| acc + (*b1 ^ *b2).count_ones() as u32))
 }
 
-// dont understand this yet
+/*
+calculate normalised_edit_distance over whole stream as text has been encrypted
+by repeating key over the stream. This will increase the accuracy of the detected
+keysize as the edit distance will be smaller when normalized across the entire stream
+as incorrect keysizes will have more variation
+*/
 pub fn normalised_edit_distance(
    bytes: &[u8],
    keysize: usize,
@@ -90,6 +93,18 @@ where
       }
    }
    transposed_matrix
+}
+
+pub fn single_byte_xor(input: &str, key: u8) -> String {
+   let decoded = hex::decode(input).unwrap();
+
+   let xor_bytes: Vec<u8> = decoded.iter().map(|&c| c ^ key).collect();
+
+   hex::encode(xor_bytes)
+}
+
+pub fn single_byte_xor_bytes(input: &Vec<u8>, key: u8) -> Vec<u8> {
+   input.iter().map(|&c| c ^ key).collect()
 }
 
 #[cfg(test)]

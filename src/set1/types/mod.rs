@@ -19,3 +19,9 @@ impl Ord for KeyAndEditDistPair {
 }
 
 impl Eq for KeyAndEditDistPair {}
+
+pub struct DecipheredText {
+    pub text: String,
+    pub key: u8,
+    pub score: i32,
+}
