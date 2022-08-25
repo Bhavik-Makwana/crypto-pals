@@ -2,7 +2,7 @@ extern crate aes;
 pub mod block_ciphers;
 pub mod helper;
 
-use crate::set1::aes_ecb;
+use crate::set1::aes_ecb_decrypt;
 use crate::set2::aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use aes::cipher::generic_array::GenericArray;
 use aes::Aes128;
@@ -104,7 +104,7 @@ mod tests {
     fn aes_ecb() {
         let ptxt = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         let ctxt = block_ciphers::aes_ecb_encrypt(ptxt, "YELLOW SUBMARINE", false);
-        let res = set1::aes_ecb(&ctxt, "YELLOW SUBMARINE", true);
+        let res = set1::aes_ecb_decrypt(&ctxt, "YELLOW SUBMARINE", true);
         assert_eq!(res, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     }
 
