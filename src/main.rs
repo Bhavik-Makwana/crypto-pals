@@ -17,12 +17,8 @@ fn main() {
     // println!("msg: {:?}", decrypted_text);
     // set1::helper::count_repeating_blocks("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".as_bytes());
     let res = (0..50)
-        .map(|_| set2::ecryption_oracle("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+        .map(|_| set2::ecryption_oracle("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
         .filter(|x| *x == 1)
         .count();
     println!("res: {}", res);
-    let ptxt = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    let ctxt = set2::aes_ecb_encrypt(ptxt, "YELLOW SUBMARINE", false);
-    let res = set1::aes_ecb(&ctxt, "YELLOW SUBMARINE", true);
-    println!("{}", res);
 }

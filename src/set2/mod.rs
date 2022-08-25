@@ -75,11 +75,11 @@ pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Vec<u8> {
 
 // challenge 11
 pub fn ecryption_oracle(plaintext: &str) -> u8 {
-    let key = "YELLOW SUBMARINE"; //random_aes_key();
+    let key = random_aes_key();
     let padding = random_padding();
 
-    // let padded_plaintext = format!("{}{}{}", padding, plaintext, padding);
-    let padded_plaintext = format!("{}", plaintext);
+    let padded_plaintext = format!("{}{}{}", padding, plaintext, padding);
+    // let padded_plaintext = format!("{}", plaintext);
 
     let mut rng = thread_rng();
     let choice = rng.gen_range(0..=1);
@@ -90,17 +90,16 @@ pub fn ecryption_oracle(plaintext: &str) -> u8 {
         // ciphertext = aes_ecb_encrypt(&padded_plaintext, &key, false);
     } else {
         // println!("ECB expected");
-        // let pkcs7_padding = pkcs7(&padded_plaintext, 16);
+        let pkcs7_padding = pkcs7(&padded_plaintext, 16);
         // let send = &base64::encode(&padded_plaintext);
         // println!("{}", padded_plaintext);
-        ciphertext = aes_ecb_encrypt(&padded_plaintext, &key, false);
-        println!("{:?}", ciphertext);
+        ciphertext = aes_ecb_encrypt(&pkcs7_padding, &key, false);
     }
     if detect_ecb(&ciphertext) {
-        println!("ECB");
+        // println!("ECB");
         return 1;
     }
-    println!("CBC");
+    // println!("CBC");
     0
 }
 pub fn aes_ecb_encrypt(plaintext: &str, key: &str, is_base64: bool) -> String {
@@ -110,9 +109,6 @@ pub fn aes_ecb_encrypt(plaintext: &str, key: &str, is_base64: bool) -> String {
     } else {
         bytes = plaintext.as_bytes().to_vec();
     }
-    println!("plaintext bytes {:?}", bytes);
-
-    println!("LEN OF BYTES {}", bytes.len());
     let key_bytes = GenericArray::from_slice(key.as_bytes());
 
     let mut blocks = Vec::new();
@@ -121,7 +117,6 @@ pub fn aes_ecb_encrypt(plaintext: &str, key: &str, is_base64: bool) -> String {
             &bytes[block_len..block_len + 16],
         ))
     });
-    println!("LEN OF BLOCKS {}", blocks[1].len());
     let cipher = Aes128::new(&key_bytes);
     cipher.encrypt_blocks(&mut blocks);
 
@@ -196,6 +191,31 @@ pub fn random_padding() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::set1;
+
+    #[test]
+    fn challenge_eleven() {
+        let mut total = 0;
+        for i in 0..10 {
+            let res = (0..50)
+            .map(|_| ecryption_oracle("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+            .filter(|x| *x == 1)
+            .count();
+            total += res;
+        }
+        let avg = total / 10;
+        let range = 23..28;
+        assert!(range.contains(&avg));
+    }
+
+    #[test]
+    fn aes_ecb() {
+        let ptxt = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        let ctxt = aes_ecb_encrypt(ptxt, "YELLOW SUBMARINE", false);
+        let res = set1::aes_ecb(&ctxt, "YELLOW SUBMARINE", true);
+        assert_eq!(res, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    }
+
     #[test]
     fn challenge_nine() {
         let plaintext = "YELLOW SUBMARINE";
