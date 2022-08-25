@@ -18,7 +18,7 @@ fn main() {
     // set1::helper::count_repeating_blocks("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".as_bytes());
     let res = (0..50)
         .map(|_| set2::ecryption_oracle("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
-        .filter(|x| *x == 1)
+        .filter(|x| *x == set2::AesBlockMode::ECB)
         .count();
     println!("res: {}", res);
 }
