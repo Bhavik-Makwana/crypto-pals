@@ -5,12 +5,15 @@ use std::collections::BinaryHeap;
 use std::collections::HashSet;
 
 pub fn count_repeating_blocks(ciphertext: &[u8]) -> u32 {
-   if ciphertext.len() % 16 != 0 {
-      return 0;
-   }
+   println!("{:?}", ciphertext);
+   // if ciphertext.len() % 16 != 0 {
+   //    return 0;
+   // }
 
-   let chunks = ciphertext.chunks(16);
-   let unique_chunks: HashSet<&[u8]> = HashSet::from_iter(ciphertext.chunks(16));
+   let chunks: Vec<_> = ciphertext.chunks(16).collect();
+   let unique_chunks: HashSet<_> = chunks.iter().cloned().collect();
+   println!("chunks {:?} {}", chunks, chunks.len());
+   println!("unqiue {:?} {}", unique_chunks, unique_chunks.len());
    (chunks.len() - unique_chunks.len()) as u32
 }
 

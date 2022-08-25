@@ -35,9 +35,13 @@ pub fn detect_ecb(filename: &str) -> (u32, String, usize) {
 }
 
 // challenge 7
-pub fn aes_ecb(filename: &str, key: &str) -> String {
-    let lines = io::read_file_no_newline(filename);
-    let bytes = base64::decode(lines).unwrap();
+pub fn aes_ecb(plaintext: &str, key: &str, is_base64: bool) -> String {
+    let bytes;
+    if is_base64 {
+        bytes = base64::decode(plaintext).unwrap();
+    } else {
+        bytes = plaintext.as_bytes().to_vec();
+    }
     let key_bytes = GenericArray::from_slice(key.as_bytes());
 
     let mut blocks = Vec::new();
@@ -229,10 +233,11 @@ mod tests {
 
     #[test]
     fn challenge_seven() {
-        let string = "input/set1_challenge7_test.txt";
+        let filename = "input/set1_challenge7_test.txt";
+        let lines = io::read_file_no_newline(filename);
         let key = "YELLOW SUBMARINE";
         assert_eq!(
-            aes_ecb(string, key),
+            aes_ecb(&lines, key, true),
             "test\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}"
         );
     }
