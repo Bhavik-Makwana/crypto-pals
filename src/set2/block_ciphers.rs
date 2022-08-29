@@ -37,22 +37,17 @@ pub fn aes_ecb_encrypt_bytes(plaintext: &Vec<u8>, key: &str) -> Vec<u8> {
     let cipher = Aes128::new(&key_bytes);
     cipher.encrypt_blocks(&mut blocks);
     blocks.into_iter().flatten().collect::<Vec<u8>>()
-    // base64::encode(blocks.into_iter().flatten().collect::<Vec<u8>>())
 }
 
 pub fn pkcs7(plaintext: &Vec<u8>, block_size: usize) -> Vec<u8> {
     let plaintext_len = plaintext.len();
     let padding_amount = block_size - plaintext_len % block_size;
-    // let padding_char = padding_amount as u8 as char;
     let padding: Vec<u8> = (0..padding_amount).map(|_| padding_amount as u8).collect();
     plaintext.iter().chain(padding.iter()).cloned().collect()
-    // format!("{}{}", plaintext, padding).to_string()
 }
 
 pub fn aes128_cbc_encrypt(plaintext: &str, key: &str, iv_str: &str) -> String {
-    // let lines = io::read_file_no_newline(filename);
     let bytes = pkcs7(&plaintext.as_bytes().to_vec(), 16);
-    // let bytes = padded_msg.as_bytes();
     let iv = iv_str.as_bytes().to_vec();
 
     let key_bytes = GenericArray::from_slice(key.as_bytes());

@@ -16,19 +16,14 @@ use aes::Aes128;
 pub fn detect_ecb(filename: &str) -> (u32, String, usize) {
     let lines = io::lines_from_file(filename);
     let mut max = (0, "".to_string(), 0);
-    // slow af
-    // lines
-    //     .iter()
-    //     .enumerate()
-    //     .map(|(i, line)| hex::decode(line).unwrap())
-    //     .max_by_key(|b| helper::count_repeating_blocks(b))
-    //     .unwrap()
-
-    lines.iter().map(|line| hex::decode(line).unwrap());
-    for (i, line) in lines.iter().enumerate() {
-        let cnt = helper::count_repeating_blocks(line.as_bytes());
+    let decoded_lines: Vec<_> = lines
+        .iter()
+        .map(|line| hex::decode(line).unwrap())
+        .collect();
+    for (i, line) in decoded_lines.iter().enumerate() {
+        let cnt = helper::count_repeating_blocks(line);
         if cnt > max.0 {
-            max = (cnt, line.to_string(), i);
+            max = (cnt, String::from_utf8_lossy(line).to_string(), i);
         }
     }
     return max;
