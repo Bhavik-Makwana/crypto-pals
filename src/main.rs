@@ -16,9 +16,6 @@ fn main() {
     // let decrypted_text = set2::aes128_cbc_decrypt(&ciphertext, key, &iv);
     // println!("msg: {:?}", decrypted_text);
     // set1::helper::count_repeating_blocks("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".as_bytes());
-    let res = (0..50)
-        .map(|_| set2::ecryption_oracle("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
-        .filter(|x| *x == set2::AesBlockMode::ECB)
-        .count();
+    let res = set2::break_ecb();
     println!("res: {}", res);
 }
