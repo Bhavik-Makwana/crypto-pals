@@ -7,6 +7,11 @@ pub fn detect_ecb(ciphertext: &str) -> bool {
     set1_helper::count_repeating_blocks(&bytes) > 0
 }
 
+pub fn detect_ecb_bytes(ciphertext: &Vec<u8>) -> bool {
+    // let bytes = base64::decode(&&ciphertext).unwrap();
+    set1_helper::count_repeating_blocks(&ciphertext) > 0
+}
+
 pub fn random_aes_key() -> String {
     thread_rng()
         .sample_iter(&Alphanumeric)

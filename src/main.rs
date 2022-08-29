@@ -17,5 +17,7 @@ fn main() {
     // println!("msg: {:?}", decrypted_text);
     // set1::helper::count_repeating_blocks("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".as_bytes());
     let res = set2::break_ecb();
+    // let pt = set2::block_ciphers::pkcs7_bytes("TEST".as_bytes().to_vec(), 16);
+    // let res = set2::block_ciphers::aes_ecb_encrypt_bytes(&pt, "YELLOW SUBMARINE");
     println!("res: {}", res);
 }

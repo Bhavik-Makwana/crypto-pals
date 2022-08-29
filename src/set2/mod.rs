@@ -6,9 +6,9 @@ use crate::set1::aes_ecb_decrypt;
 use crate::set2::aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use aes::cipher::generic_array::GenericArray;
 use aes::Aes128;
-
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use std::collections::HashMap;
 
 #[derive(PartialEq)]
 pub enum AesBlockMode {
@@ -28,12 +28,14 @@ pub fn ecryption_oracle(plaintext: &str) -> AesBlockMode {
     let mut ciphertext;
     if choice == 0 {
         let iv: String = (0..16).map(|_| 0 as u8 as char).collect();
-        ciphertext = block_ciphers::aes128_cbc_encrypt(&padded_plaintext, &key, &iv);
+        ciphertext = block_ciphers::aes128_cbc_encrypt(&padded_plaintext, &key, &iv)
+            .as_bytes()
+            .to_vec();
     } else {
-        let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
-        ciphertext = block_ciphers::aes_ecb_encrypt(&pkcs7_padding, &key, false);
+        let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext.as_bytes().to_vec(), 16);
+        ciphertext = block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &key);
     }
-    if helper::detect_ecb(&ciphertext) {
+    if helper::detect_ecb_bytes(&ciphertext) {
         return AesBlockMode::ECB;
     }
     AesBlockMode::CBC
@@ -41,28 +43,23 @@ pub fn ecryption_oracle(plaintext: &str) -> AesBlockMode {
 
 // Challenge 12
 // create an oracle
-pub fn ecb_oracle(plaintext: &str) -> String {
+pub fn ecb_oracle(plaintext: &Vec<u8>) -> Vec<u8> {
     let key = "YELLOW SUBMARINE";
-    let pkcs7_padding = block_ciphers::pkcs7(&plaintext, 16);
-
-    block_ciphers::aes_ecb_encrypt(&pkcs7_padding, &key, false)
-}
-
-pub fn ecb_oracle_padded(plaintext: &str) -> String {
-    let key = "YELLOW SUBMARINE";
-    // let padding_base64 = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
-    // .to_string();
-    let padding_base64 = "cGVsYXNlIHdvcmsgd3RmIGlzIGdvaW5nIHdyb25nIGFoaGFwZWxhc2Ugd29yayB3dGYgaXMgZ29pbmcgd3JvbmcgYWhoYQ==".to_string();
-    let padding: String = base64::decode(padding_base64)
-        .unwrap()
-        .iter()
-        .map(|c| *c as u8 as char)
-        .collect();
-
-    let padded_plaintext = format!("{}{}", plaintext, padding);
+    // const UNKNOWN_Sstr = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
+    let padding_base64 = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
+    .to_string();
+    // let padding_base64 = "cGVsYXNlIHdvcmsgd3RmIGlzIGdvaW5nIHdyb25nIGFoaGFwZWxhc2Ugd29yayB3dGYgaXMgZ29pbmcgd3JvbmcgYWhoYQ==".to_string();
+    // let padding: String = base64::decode(padding_base64)
+    //     .unwrap()
+    //     .iter()
+    //     .map(|c| *c as u8 as char)
+    //     .collect();
+    let padding = base64::decode(padding_base64).unwrap();
+    let padded_plaintext = plaintext.iter().chain(padding.iter()).cloned().collect();
+    // let padded_plaintext = format!("{}{}", plaintext, padding);
     let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
 
-    block_ciphers::aes_ecb_encrypt(&pkcs7_padding, &key, false)
+    block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &key)
 }
 
 /*  --- Detect block size ---
@@ -70,11 +67,11 @@ pub fn ecb_oracle_padded(plaintext: &str) -> String {
     n-1 is the block size length
 */
 pub fn identify_blocksize() -> usize {
-    let mut input = "A".to_string();
-    let mut curr = ecb_oracle_padded(&input);
-    let mut prev = ecb_oracle_padded(&input);
+    let mut input: Vec<u8> = "A".to_string().as_bytes().to_vec();
+    let mut curr = ecb_oracle(&input);
+    let mut prev = ecb_oracle(&input);
     loop {
-        input.push_str("A");
+        input.push('A' as u8);
         curr = ecb_oracle(&input);
         if (curr[0..4] == prev[0..4]) {
             break;
@@ -90,8 +87,8 @@ pub fn identify_blocksize() -> usize {
 */
 fn identify_if_ecb() -> bool {
     let res: f64 = (0..50)
-            .map(|_| ecb_oracle("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
-            .map(|a| helper::detect_ecb(&a))
+            .map(|_| ecb_oracle(&"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".as_bytes().to_vec()))
+            .map(|a| helper::detect_ecb_bytes(&a))
             .filter(|x| *x == true)
             .count() as f64;
     if ((res / 50.0) >= 0.8) {
@@ -101,82 +98,88 @@ fn identify_if_ecb() -> bool {
 }
 
 fn identify_payload_length() -> usize {
-    let previous_length = ecb_oracle_padded("").len();
+    let previous_length = ecb_oracle(&"".as_bytes().to_vec()).len();
     let mut i = 0;
     let mut input = "A".to_string();
     loop {
-        let length = ecb_oracle_padded(&input).len();
+        let length = ecb_oracle(&input.as_bytes().to_vec()).len();
         input.push_str("A");
         if length != previous_length {
-            break;
+            return previous_length - i;
         }
         i += 1;
     }
-    return previous_length - (i + 1);
 }
 
-fn break_ecb_byte(plaintext: &str, block_size: i32) -> char {
+fn break_ecb_byte(plaintext: &Vec<u8>, block_size: i32) -> Vec<u8> {
     let k = plaintext.len() as i32;
-    let attack_payload_size = (-k - 1).rem_euclid(block_size) as usize;
-    println!("payload size {}", attack_payload_size);
-    let mut attack_payload: String = (0..attack_payload_size).map(|_| "A").collect();
-    println!("payload {}", attack_payload);
+    let padding_length = (-k - 1).rem_euclid(block_size) as usize;
+    // println!("payload size {}", padding_length);
+    let mut padding: Vec<u8> = (0..padding_length).map(|_| 'A' as u8).collect(); //vec![b"A"; padding_length];
+                                                                                 // println!("payload {}", padding);
     let target_block_num = (k / block_size) as usize;
-    let mut ciphertext = ecb_oracle_padded(&attack_payload);
+    let mut ciphertext = ecb_oracle(&padding);
     let target_block = &ciphertext
         [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
-    println!("{}={}/{}", target_block_num, k, block_size);
-    for i in 0..128 {
-        let message = format!("{}{}{}", attack_payload, plaintext, i as u8 as char);
-        println!(
-            "i {} {}",
-            i,
-            &message[target_block_num * block_size as usize
-                ..(target_block_num + 1) * block_size as usize]
-        );
-        println!(
-            "SLICE: [{}..{}]",
-            target_block_num * block_size as usize,
-            (target_block_num + 1) * block_size as usize
-        );
-        let block = &ecb_oracle_padded(&message)
+    // println!("{}={}/{}", target_block_num, k, block_size);
+    // println!(
+    //     "SLICE: [{}..{}]",
+    //     target_block_num * block_size as usize,
+    //     (target_block_num + 1) * block_size as usize
+    // );
+    for i in (0..=255) {
+        // println!(
+        //     "\tpadding: {}\n\tplaintext{}\n\tchar: {}",
+        //     padding.len(),
+        //     k,
+        //     i
+        // );
+        // let message = format!("{}{}{}", padding, plaintext, i as u8);
+        let mut message: Vec<u8> = padding.iter().chain(plaintext.iter()).cloned().collect();
+        message.push(i);
+        // println!(
+        //     "i {} {}",
+        //     i,
+        //     &message[target_block_num * block_size as usize
+        //         ..(target_block_num + 1) * block_size as usize]
+        // );
+        let block = &ecb_oracle(&message)
             [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
         if block == target_block {
-            println!(
-                "target: {} \ncurr:{}   char {}: {}\n pt: {}",
-                target_block, block, i, i as u8 as char, plaintext
-            );
-            println!("MATCHINGMATCHING");
-            return i as u8 as char;
+            // println!(
+            //     "    target: {} \n    curr:{}   char {}: {}\n",
+            //     target_block, block, i, i as u8 as char
+            // );
+            // println!("MATCHINGMATCHING");
+            return vec![i];
         }
         // if i as u8 as char == 'r' {
 
-        println!(
-            "idx: {} block: {} pt: {}{}",
-            i, target_block_num, plaintext, i as u8 as char
-        );
+        // println!(
+        //     "idx: {} block: {} pt: {}{}",
+        //     i, target_block_num, plaintext, i as u8 as char
+        // );
     }
     panic!("Failed");
 }
 
 pub fn break_ecb() -> String {
-    // let secret_message_length = identify_payload_length();
-    let secret_message_length = "cGVsYXNlIHdvcmsgd3RmIGlzIGdvaW5nIHdyb25nIGFoaGFwZWxhc2Ugd29yayB3dGYgaXMgZ29pbmcgd3JvbmcgYWhoYQ=="
-        .to_string()
-        .chars()
-        .count();
-    let block_size = 16; //identify_blocksize();
+    let secret_message_length = identify_payload_length();
+    let block_size = identify_blocksize();
     println!(
         "msg len {} block size {}",
         secret_message_length, block_size
     );
-    let mut known_plaintext = "".to_string();
+    let mut known_plaintext: Vec<u8> = "".to_string().as_bytes().to_vec();
     for _ in 0..secret_message_length {
         let new_byte = break_ecb_byte(&known_plaintext, block_size as i32);
-        known_plaintext = format!("{}{}", known_plaintext, new_byte);
-        println!("{}", known_plaintext);
+        known_plaintext = known_plaintext
+            .iter()
+            .chain(new_byte.iter())
+            .cloned()
+            .collect();
     }
-    known_plaintext
+    String::from_utf8_lossy(&known_plaintext).to_string()
 }
 // fn build_dictionary(input: &str) -> HashSet<String> {}
 /*  --- Create dictionary ---
@@ -203,7 +206,7 @@ mod tests {
 
     #[test]
     fn identify_length_of_payload() {
-        assert_eq!(identify_payload_length(), 192);
+        assert_eq!(identify_payload_length(), 139);
     }
 
     #[test]
@@ -236,11 +239,11 @@ mod tests {
 
     #[test]
     fn challenge_nine() {
-        let plaintext = "YELLOW SUBMARINE";
+        let plaintext = "YELLOW SUBMARINE".as_bytes().to_vec();
         let block_size = 20;
         assert_eq!(
-            block_ciphers::pkcs7(plaintext, block_size),
-            "YELLOW SUBMARINE\x04\x04\x04\x04"
+            block_ciphers::pkcs7(&plaintext, block_size),
+            "YELLOW SUBMARINE\x04\x04\x04\x04".as_bytes().to_vec()
         )
     }
 
