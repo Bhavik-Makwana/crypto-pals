@@ -1,5 +1,5 @@
 use crate::set1::helper as set1_helper;
-use crate::set2::AesEcb128Oracle;
+use crate::set2::oracles::AesEcb128Oracle;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 pub fn detect_ecb(ciphertext: &Vec<u8>) -> bool {

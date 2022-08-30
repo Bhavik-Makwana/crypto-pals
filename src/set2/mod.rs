@@ -2,7 +2,9 @@ extern crate aes;
 pub mod block_ciphers;
 pub mod helper;
 pub mod profile;
+pub mod oracles;
 
+use oracles::AesEcb128Oracle;
 use profile::Profile;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -121,45 +123,9 @@ pub fn cut_and_paste_ecb(p: &Profile) -> Vec<u8> {
     manipulated_profile
 }
 
-pub struct AesEcb128Oracle {
-    key: String,
-    prefix: Option<Vec<u8>>,
-    target_bytes: Vec<u8>,
-}
 
-impl AesEcb128Oracle {
-    pub fn encrypt(&self, plaintext: &Vec<u8>) -> Vec<u8> {
-        if let Some(_) = self.prefix {
-            return self.ecb_oracle_with_prefix(plaintext);
-        } else {
-            return self.ecb_oracle_no_prefix(plaintext);
-        }
-    }
 
-    fn ecb_oracle_with_prefix(&self, plaintext: &Vec<u8>) -> Vec<u8> {
-        let padding = base64::decode(self.target_bytes.clone()).unwrap();
-        let padded_plaintext = self
-            .prefix
-            .as_ref()
-            .unwrap()
-            .iter()
-            .chain(plaintext.iter())
-            .chain(padding.iter())
-            .cloned()
-            .collect();
-        let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
-        block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &self.key)
-    }
-
-    fn ecb_oracle_no_prefix(&self, plaintext: &Vec<u8>) -> Vec<u8> {
-        let padding = base64::decode(self.target_bytes.clone()).unwrap();
-        let padded_plaintext = plaintext.iter().chain(padding.iter()).cloned().collect();
-        let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
-        block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &self.key)
-    }
-}
-
-pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
+pub fn identify_prefix_size(oracle: &AesEcb128Oracle) -> usize {
     let mut plainbytes = vec!['A' as u8; 1];
     let mut curr: Vec<u8>;
     let mut prev = oracle
@@ -168,7 +134,6 @@ pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
         .take(16)
         .cloned()
         .collect();
-    let mut i = 0;
     for i in 0..16 {
         curr = oracle
             .encrypt(&plainbytes)
@@ -178,12 +143,10 @@ pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
             .collect();
 
         if curr == prev {
-            println!("{}", i);
-            return 16 - (i % 16);
+            return 16 - i;
         }
         prev = curr;
         plainbytes.push('A' as u8);
-        // println!("curr: {:?}\nprev: {:?}\n", curr, prev);
     }
     panic!("Did not find prefix");
 }
@@ -223,7 +186,7 @@ pub fn byte_at_a_time_ecb_decryption() -> String {
     };
     let secret_message_length = helper::identify_payload_length(&oracle);
     let block_size = helper::identify_blocksize(&oracle);
-    let padding_size = identify_padding_size(&oracle);
+    let padding_size = identify_prefix_size(&oracle);
     if !helper::identify_if_ecb(&oracle) {
         panic!("Not an ECB encrypted message")
     }
