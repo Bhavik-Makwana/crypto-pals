@@ -24,6 +24,14 @@ pub fn random_padding() -> String {
         .collect()
 }
 
+pub fn random_bytes() -> Vec<u8> {
+    let mut rng = thread_rng();
+    thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(rng.gen_range(0..=15))
+        .collect()
+}
+
 /*  --- Detect if ECB ---
     create 10 blocks of repeating characters (e.g. for 4 byte blocks create 10 'AAAA')
     if the blocks are all the same its ECB

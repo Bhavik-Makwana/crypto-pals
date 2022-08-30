@@ -1,7 +1,9 @@
 extern crate aes;
 pub mod block_ciphers;
 pub mod helper;
+pub mod profile;
 
+use profile::Profile;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 
@@ -88,46 +90,8 @@ pub fn break_ecb() -> String {
     String::from_utf8_lossy(&known_plaintext).to_string()
 }
 
-pub fn kv_parser_raw(input: &str) -> HashMap<String, String> {
-    input
-        .split("&")
-        .map(|pair| pair.split("=").collect::<Vec<_>>())
-        .map(|v| (String::from(v[0]), String::from(v[1])))
-        .collect()
-}
-
-pub struct Profile {
-    key: String,
-}
-
-impl Profile {
-    pub fn new(&self, key: &str) -> Self {
-        Profile {
-            key: key.to_string(),
-        }
-    }
-
-    pub fn encrypt_profile(&self, profile: &str) -> Vec<u8> {
-        let padded = block_ciphers::pkcs7(&profile.as_bytes().to_vec(), 16);
-        block_ciphers::aes_ecb_encrypt_bytes(&padded, &self.key)
-    }
-
-    pub fn decrypt_profile(&self, cipherbytes: Vec<u8>) -> HashMap<String, String> {
-        let profile = block_ciphers::aes_ecb_decrypt(&cipherbytes, &self.key);
-        kv_parser_raw(&profile)
-    }
-
-    pub fn profile_for(&self, email: &str) -> String {
-        let sanitized_email: String = email.chars().filter(|c| *c != '&' && *c != '=').collect();
-        format!("email={}&uid=10&role=user", sanitized_email)
-    }
-}
-
 //challenge 13
-pub fn cut_and_paste_ecb() -> Vec<u8> {
-    let p = Profile {
-        key: "YELLOW SUBMARINE".to_string(),
-    };
+pub fn cut_and_paste_ecb(p: &Profile) -> Vec<u8> {
     let block_size = 16;
     let malicious_email = "atck@mail.com";
     let malicious_profile = p.profile_for(&malicious_email);
@@ -151,17 +115,135 @@ pub fn cut_and_paste_ecb() -> Vec<u8> {
     manipulated_profile
 }
 
+pub struct AesEcb128Oracle {
+    key: Vec<u8>,
+    prefix: Vec<u8>,
+}
+
+impl AesEcb128Oracle {
+    pub fn ecb_oracle_with_prefix(&self, plaintext: &Vec<u8>) -> Vec<u8> {
+        const KEY: &str = "YELLOW SUBMARINE";
+        const PADDING_BASE64: &str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
+        let padding = base64::decode(PADDING_BASE64).unwrap();
+        let padded_plaintext = self
+            .prefix
+            .iter()
+            .chain(plaintext.iter())
+            .chain(padding.iter())
+            .cloned()
+            .collect();
+        let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
+        block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &KEY)
+    }
+}
+// challenge 14
+
+pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
+    let mut plainbytes = vec!['A' as u8; 1];
+    let mut curr: Vec<u8>;
+    let mut prev = oracle
+        .ecb_oracle_with_prefix(&vec![])
+        .iter()
+        .take(16)
+        .cloned()
+        .collect();
+    let mut i = 0;
+    for i in 0..16 {
+        curr = oracle
+            .ecb_oracle_with_prefix(&plainbytes)
+            .iter()
+            .take(16)
+            .cloned()
+            .collect();
+
+        if curr == prev {
+            println!("{}", i);
+            return 16 - (i % 16);
+        }
+        prev = curr;
+        plainbytes.push('A' as u8);
+        // println!("curr: {:?}\nprev: {:?}\n", curr, prev);
+    }
+    panic!("Did not find prefix");
+}
+
+fn break_ecb_byte_prefix(
+    oracle: &AesEcb128Oracle,
+    plaintext: &Vec<u8>,
+    block_size: i32,
+    padding_size: i32,
+) -> Vec<u8> {
+    let k = plaintext.len() as i32;
+    let padding_length = (-k - 1 - padding_size).rem_euclid(block_size) as usize;
+    let target_block_num = ((k + padding_size) / block_size) as usize;
+    let padding: Vec<u8> = (0..padding_length).map(|_| 'A' as u8).collect();
+    let cipherbytes = oracle.ecb_oracle_with_prefix(&padding);
+    let target_block = &cipherbytes
+        [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
+    for i in 0..=255 {
+        let mut message: Vec<u8> = padding.iter().chain(plaintext.iter()).cloned().collect();
+        message.push(i);
+        let block = &oracle.ecb_oracle_with_prefix(&message)
+            [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
+        if block == target_block {
+            return vec![i];
+        }
+    }
+    panic!("Failed");
+}
+
+pub fn byte_at_a_time_ecb_decryption() -> String {
+    let oracle = AesEcb128Oracle {
+        key: "YELLOW SUBMARINE".as_bytes().to_vec(),
+        prefix: helper::random_bytes(),
+    };
+    let secret_message_length = helper::identify_payload_length();
+    let block_size = helper::identify_blocksize();
+    let padding_size = identify_padding_size(&oracle);
+    if !helper::identify_if_ecb() {
+        panic!("Not an ECB encrypted message")
+    }
+    let mut known_plaintext: Vec<u8> = "".to_string().as_bytes().to_vec();
+    for _ in 0..secret_message_length {
+        let new_byte = break_ecb_byte_prefix(
+            &oracle,
+            &known_plaintext,
+            block_size as i32,
+            padding_size as i32,
+        );
+        known_plaintext = known_plaintext
+            .iter()
+            .chain(new_byte.iter())
+            .cloned()
+            .collect();
+        println!("{}", String::from_utf8_lossy(&known_plaintext).to_string());
+    }
+    String::from_utf8_lossy(&known_plaintext).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::set1;
 
     #[test]
+    fn challenge_fourteen() {
+        assert_eq!(
+            byte_at_a_time_ecb_decryption(),
+            "Rollin' in my 5.0\
+        \nWith my rag-top down so my hair can blow\
+        \nThe girlies on standby waving just to say hi\
+        \nDid you stop? No, I just drove by\
+        \n\u{1}"
+        );
+    }
+
+    #[test]
     fn challenge_thirteen() {
         let p = Profile {
             key: "YELLOW SUBMARINE".to_string(),
         };
-        let res = cut_and_paste_ecb();
+        let res = cut_and_paste_ecb(&p);
         let expected = "email=atck@mail.com&uid=10&role=user";
         let decrypted = p.decrypt_profile(res);
         assert_eq!(decrypted.get("role").unwrap(), "admin");
@@ -174,7 +256,7 @@ mod tests {
         let profile: String = "email=test@mail.com&uid=10&role=user".to_string();
         let key = helper::random_aes_key();
         let p = Profile { key };
-        let parsed_profile = kv_parser_raw(&profile);
+        let parsed_profile = Profile::kv_parser_raw(&profile);
         let result = p.decrypt_profile(p.encrypt_profile(&profile));
         assert_eq!(parsed_profile, result);
     }
@@ -200,13 +282,16 @@ mod tests {
 
     #[test]
     fn parses_input_correctly() {
+        let p = Profile {
+            key: "YELLOW SUBMARINE".to_string(),
+        };
         let input = "foo=bar&baz=qux&zap=zazzle";
         let expected = HashMap::from([
             ("foo".to_string(), "bar".to_string()),
             ("baz".to_string(), "qux".to_string()),
             ("zap".to_string(), "zazzle".to_string()),
         ]);
-        assert_eq!(kv_parser_raw(input), expected)
+        assert_eq!(Profile::kv_parser_raw(input), expected)
     }
 
     #[test]
