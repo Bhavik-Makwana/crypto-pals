@@ -3,6 +3,7 @@ pub mod block_ciphers;
 pub mod helper;
 
 use rand::{thread_rng, Rng};
+use std::collections::HashMap;
 
 #[derive(PartialEq)]
 pub enum AesBlockMode {
@@ -48,39 +49,6 @@ pub fn ecb_oracle(plaintext: &Vec<u8>) -> Vec<u8> {
     block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &KEY)
 }
 
-/*  --- Detect block size ---
-    feed n characters byte by byte into oracle until you get 2 blocks,
-    n-1 is the block size length
-*/
-pub fn identify_blocksize() -> usize {
-    let mut input: Vec<u8> = vec!['A' as u8; 1];
-    let mut curr;
-    let mut prev = ecb_oracle(&input);
-    loop {
-        input.push('A' as u8);
-        curr = ecb_oracle(&input);
-        if curr[0..4] == prev[0..4] {
-            break;
-        }
-        prev = curr;
-    }
-    input.len() - 1
-}
-
-fn identify_payload_length() -> usize {
-    let previous_length = ecb_oracle(&"".as_bytes().to_vec()).len();
-    let mut i = 0;
-    let mut input = vec!['A' as u8; 1];
-    loop {
-        let length = ecb_oracle(&input).len();
-        input.push('A' as u8);
-        if length != previous_length {
-            return previous_length - i;
-        }
-        i += 1;
-    }
-}
-
 fn break_ecb_byte(plaintext: &Vec<u8>, block_size: i32) -> Vec<u8> {
     let k = plaintext.len() as i32;
     let padding_length = (-k - 1).rem_euclid(block_size) as usize;
@@ -103,8 +71,8 @@ fn break_ecb_byte(plaintext: &Vec<u8>, block_size: i32) -> Vec<u8> {
 }
 
 pub fn break_ecb() -> String {
-    let secret_message_length = identify_payload_length();
-    let block_size = identify_blocksize();
+    let secret_message_length = helper::identify_payload_length();
+    let block_size = helper::identify_blocksize();
     if !helper::identify_if_ecb() {
         panic!("Not an ECB encrypted message")
     }
@@ -120,10 +88,126 @@ pub fn break_ecb() -> String {
     String::from_utf8_lossy(&known_plaintext).to_string()
 }
 
+pub fn kv_parser_raw(input: &str) -> HashMap<String, String> {
+    input
+        .split("&")
+        .map(|pair| pair.split("=").collect::<Vec<_>>())
+        .map(|v| (String::from(v[0]), String::from(v[1])))
+        .collect()
+}
+
+pub struct Profile {
+    key: String,
+}
+
+impl Profile {
+    pub fn new(&self, key: &str) -> Self {
+        Profile {
+            key: key.to_string(),
+        }
+    }
+
+    pub fn encrypt_profile(&self, profile: &str) -> Vec<u8> {
+        let padded = block_ciphers::pkcs7(&profile.as_bytes().to_vec(), 16);
+        block_ciphers::aes_ecb_encrypt_bytes(&padded, &self.key)
+    }
+
+    pub fn decrypt_profile(&self, cipherbytes: Vec<u8>) -> HashMap<String, String> {
+        let profile = block_ciphers::aes_ecb_decrypt(&cipherbytes, &self.key);
+        kv_parser_raw(&profile)
+    }
+
+    pub fn profile_for(&self, email: &str) -> String {
+        let sanitized_email: String = email.chars().filter(|c| *c != '&' && *c != '=').collect();
+        format!("email={}&uid=10&role=user", sanitized_email)
+    }
+}
+
+//challenge 13
+pub fn cut_and_paste_ecb() -> Vec<u8> {
+    let p = Profile {
+        key: "YELLOW SUBMARINE".to_string(),
+    };
+    let block_size = 16;
+    let malicious_email = "atck@mail.com";
+    let malicious_profile = p.profile_for(&malicious_email);
+    // block to modify
+    let cipherbytes = p.encrypt_profile(&malicious_profile);
+    let desired_role = "admin".as_bytes().to_vec();
+    let payload = block_ciphers::pkcs7(&desired_role, block_size);
+
+    let email = format!("foo@bar.co{}", String::from_utf8(payload).unwrap());
+    let profile = p.profile_for(&email);
+    let adminbytes = p.encrypt_profile(&profile);
+
+    let malicious_block: Vec<u8> = adminbytes.iter().skip(16).take(16).cloned().collect();
+
+    let manipulated_profile: Vec<u8> = cipherbytes
+        .iter()
+        .take(32)
+        .chain(malicious_block.iter())
+        .cloned()
+        .collect();
+    manipulated_profile
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::set1;
+
+    #[test]
+    fn challenge_thirteen() {
+        let p = Profile {
+            key: "YELLOW SUBMARINE".to_string(),
+        };
+        let res = cut_and_paste_ecb();
+        let expected = "email=atck@mail.com&uid=10&role=user";
+        let decrypted = p.decrypt_profile(res);
+        assert_eq!(decrypted.get("role").unwrap(), "admin");
+        assert_eq!(decrypted.get("email").unwrap(), "atck@mail.com");
+        assert_eq!(decrypted.get("uid").unwrap(), "10");
+    }
+
+    #[test]
+    fn profile_encrypts_decrypts_correctly() {
+        let profile: String = "email=test@mail.com&uid=10&role=user".to_string();
+        let key = helper::random_aes_key();
+        let p = Profile { key };
+        let parsed_profile = kv_parser_raw(&profile);
+        let result = p.decrypt_profile(p.encrypt_profile(&profile));
+        assert_eq!(parsed_profile, result);
+    }
+
+    #[test]
+    fn creates_profile_correctly() {
+        let key = helper::random_aes_key();
+        let p = Profile { key };
+        let email = "test@mail.com";
+        let expected = "email=test@mail.com&uid=10&role=user";
+        assert_eq!(p.profile_for(email), expected);
+    }
+
+    #[test]
+    fn sanitizes_profile_correctly() {
+        let p = Profile {
+            key: "YELLOW SUBMARINE".to_string(),
+        };
+        let email = "tes&=t@mail.com";
+        let expected = "email=test@mail.com&uid=10&role=user";
+        assert_eq!(p.profile_for(email), expected);
+    }
+
+    #[test]
+    fn parses_input_correctly() {
+        let input = "foo=bar&baz=qux&zap=zazzle";
+        let expected = HashMap::from([
+            ("foo".to_string(), "bar".to_string()),
+            ("baz".to_string(), "qux".to_string()),
+            ("zap".to_string(), "zazzle".to_string()),
+        ]);
+        assert_eq!(kv_parser_raw(input), expected)
+    }
 
     #[test]
     fn challenge_twelve() {
@@ -135,21 +219,6 @@ mod tests {
         \nDid you stop? No, I just drove by\
         \n\u{1}"
         );
-    }
-
-    #[test]
-    fn identify_if_ecb_encryption() {
-        assert_eq!(helper::identify_if_ecb(), true);
-    }
-
-    #[test]
-    fn identify_length_of_payload() {
-        assert_eq!(identify_payload_length(), 139);
-    }
-
-    #[test]
-    fn identify_the_blocksize() {
-        assert_eq!(identify_blocksize(), 16);
     }
 
     #[test]

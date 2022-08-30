@@ -39,11 +39,32 @@ pub fn aes_ecb_encrypt_bytes(plaintext: &Vec<u8>, key: &str) -> Vec<u8> {
     blocks.into_iter().flatten().collect::<Vec<u8>>()
 }
 
+pub fn aes_ecb_decrypt(ciphertext: &Vec<u8>, key: &str) -> String {
+    let key_bytes = GenericArray::from_slice(key.as_bytes());
+
+    let mut blocks = Vec::new();
+    (0..ciphertext.len()).step_by(16).for_each(|block_len| {
+        blocks.push(GenericArray::clone_from_slice(
+            &ciphertext[block_len..block_len + 16],
+        ))
+    });
+    let cipher = Aes128::new(&key_bytes);
+    cipher.decrypt_blocks(&mut blocks);
+    let flattened: Vec<_> = blocks.iter().flatten().cloned().collect();
+    let unpadded = pkcs7_remove(&flattened, 16);
+    unpadded.iter().map(|&x| x as char).collect()
+}
+
 pub fn pkcs7(plaintext: &Vec<u8>, block_size: usize) -> Vec<u8> {
     let plaintext_len = plaintext.len();
     let padding_amount = block_size - plaintext_len % block_size;
     let padding: Vec<u8> = (0..padding_amount).map(|_| padding_amount as u8).collect();
     plaintext.iter().chain(padding.iter()).cloned().collect()
+}
+
+pub fn pkcs7_remove(padded_plaintext: &Vec<u8>, block_size: usize) -> Vec<u8> {
+    let padding_amount = padded_plaintext.last().unwrap();
+    padded_plaintext[0..padded_plaintext.len() - *padding_amount as usize].to_vec()
 }
 
 pub fn aes128_cbc_encrypt(plaintext: &str, key: &str, iv_str: &str) -> String {
