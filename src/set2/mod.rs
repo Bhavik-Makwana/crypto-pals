@@ -40,7 +40,7 @@ pub fn ecryption_oracle(plaintext: &str) -> AesBlockMode {
 
 // Challenge 12
 // create an oracle
-pub fn ecb_oracle(plaintext: &Vec<u8>) -> Vec<u8> {
+pub fn encrypt(plaintext: &Vec<u8>) -> Vec<u8> {
     const KEY: &str = "YELLOW SUBMARINE";
     const PADDING_BASE64: &str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
 
@@ -51,19 +51,19 @@ pub fn ecb_oracle(plaintext: &Vec<u8>) -> Vec<u8> {
     block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &KEY)
 }
 
-fn break_ecb_byte(plaintext: &Vec<u8>, block_size: i32) -> Vec<u8> {
+fn break_ecb_byte(oracle: &AesEcb128Oracle, plaintext: &Vec<u8>, block_size: i32) -> Vec<u8> {
     let k = plaintext.len() as i32;
     let padding_length = (-k - 1).rem_euclid(block_size) as usize;
     let padding: Vec<u8> = (0..padding_length).map(|_| 'A' as u8).collect(); //vec![b"A"; padding_length];
                                                                              // println!("payload {}", padding);
     let target_block_num = (k / block_size) as usize;
-    let cipherbytes = ecb_oracle(&padding);
+    let cipherbytes = oracle.encrypt(&padding);
     let target_block = &cipherbytes
         [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
     for i in 0..=255 {
         let mut message: Vec<u8> = padding.iter().chain(plaintext.iter()).cloned().collect();
         message.push(i);
-        let block = &ecb_oracle(&message)
+        let block = &oracle.encrypt(&message)
             [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
         if block == target_block {
             return vec![i];
@@ -73,14 +73,20 @@ fn break_ecb_byte(plaintext: &Vec<u8>, block_size: i32) -> Vec<u8> {
 }
 
 pub fn break_ecb() -> String {
-    let secret_message_length = helper::identify_payload_length();
-    let block_size = helper::identify_blocksize();
-    if !helper::identify_if_ecb() {
+    let oracle = AesEcb128Oracle { 
+        key: "YELLOW SUBMARINE".to_string(), 
+        prefix: None, 
+        target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec()
+    };
+
+    let secret_message_length = helper::identify_payload_length(&oracle);
+    let block_size = helper::identify_blocksize(&oracle);
+    if !helper::identify_if_ecb(&oracle) {
         panic!("Not an ECB encrypted message")
     }
     let mut known_plaintext: Vec<u8> = "".to_string().as_bytes().to_vec();
     for _ in 0..secret_message_length {
-        let new_byte = break_ecb_byte(&known_plaintext, block_size as i32);
+        let new_byte = break_ecb_byte(&oracle, &known_plaintext, block_size as i32);
         known_plaintext = known_plaintext
             .iter()
             .chain(new_byte.iter())
@@ -116,33 +122,48 @@ pub fn cut_and_paste_ecb(p: &Profile) -> Vec<u8> {
 }
 
 pub struct AesEcb128Oracle {
-    key: Vec<u8>,
-    prefix: Vec<u8>,
+    key: String,
+    prefix: Option<Vec<u8>>,
+    target_bytes: Vec<u8>,
 }
 
 impl AesEcb128Oracle {
-    pub fn ecb_oracle_with_prefix(&self, plaintext: &Vec<u8>) -> Vec<u8> {
-        const KEY: &str = "YELLOW SUBMARINE";
-        const PADDING_BASE64: &str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
-        let padding = base64::decode(PADDING_BASE64).unwrap();
+    pub fn encrypt(&self, plaintext: &Vec<u8>) -> Vec<u8> {
+        if let Some(_) = self.prefix {
+            return self.ecb_oracle_with_prefix(plaintext);
+        } else {
+            return self.ecb_oracle_no_prefix(plaintext);
+        }
+    }
+
+    fn ecb_oracle_with_prefix(&self, plaintext: &Vec<u8>) -> Vec<u8> {
+        let padding = base64::decode(self.target_bytes.clone()).unwrap();
         let padded_plaintext = self
             .prefix
+            .as_ref()
+            .unwrap()
             .iter()
             .chain(plaintext.iter())
             .chain(padding.iter())
             .cloned()
             .collect();
         let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
-        block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &KEY)
+        block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &self.key)
+    }
+
+    fn ecb_oracle_no_prefix(&self, plaintext: &Vec<u8>) -> Vec<u8> {
+        let padding = base64::decode(self.target_bytes.clone()).unwrap();
+        let padded_plaintext = plaintext.iter().chain(padding.iter()).cloned().collect();
+        let pkcs7_padding = block_ciphers::pkcs7(&padded_plaintext, 16);
+        block_ciphers::aes_ecb_encrypt_bytes(&pkcs7_padding, &self.key)
     }
 }
-// challenge 14
 
 pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
     let mut plainbytes = vec!['A' as u8; 1];
     let mut curr: Vec<u8>;
     let mut prev = oracle
-        .ecb_oracle_with_prefix(&vec![])
+        .encrypt(&vec![])
         .iter()
         .take(16)
         .cloned()
@@ -150,7 +171,7 @@ pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
     let mut i = 0;
     for i in 0..16 {
         curr = oracle
-            .ecb_oracle_with_prefix(&plainbytes)
+            .encrypt(&plainbytes)
             .iter()
             .take(16)
             .cloned()
@@ -167,6 +188,8 @@ pub fn identify_padding_size(oracle: &AesEcb128Oracle) -> usize {
     panic!("Did not find prefix");
 }
 
+// challenge 14
+
 fn break_ecb_byte_prefix(
     oracle: &AesEcb128Oracle,
     plaintext: &Vec<u8>,
@@ -177,13 +200,13 @@ fn break_ecb_byte_prefix(
     let padding_length = (-k - 1 - padding_size).rem_euclid(block_size) as usize;
     let target_block_num = ((k + padding_size) / block_size) as usize;
     let padding: Vec<u8> = (0..padding_length).map(|_| 'A' as u8).collect();
-    let cipherbytes = oracle.ecb_oracle_with_prefix(&padding);
+    let cipherbytes = oracle.encrypt(&padding);
     let target_block = &cipherbytes
         [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
     for i in 0..=255 {
         let mut message: Vec<u8> = padding.iter().chain(plaintext.iter()).cloned().collect();
         message.push(i);
-        let block = &oracle.ecb_oracle_with_prefix(&message)
+        let block = &oracle.encrypt(&message)
             [target_block_num * block_size as usize..(target_block_num + 1) * block_size as usize];
         if block == target_block {
             return vec![i];
@@ -194,13 +217,14 @@ fn break_ecb_byte_prefix(
 
 pub fn byte_at_a_time_ecb_decryption() -> String {
     let oracle = AesEcb128Oracle {
-        key: "YELLOW SUBMARINE".as_bytes().to_vec(),
-        prefix: helper::random_bytes(),
+        key: "YELLOW SUBMARINE".to_string(),
+        prefix: Some(helper::random_bytes()),
+        target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec(),
     };
-    let secret_message_length = helper::identify_payload_length();
-    let block_size = helper::identify_blocksize();
+    let secret_message_length = helper::identify_payload_length(&oracle);
+    let block_size = helper::identify_blocksize(&oracle);
     let padding_size = identify_padding_size(&oracle);
-    if !helper::identify_if_ecb() {
+    if !helper::identify_if_ecb(&oracle) {
         panic!("Not an ECB encrypted message")
     }
     let mut known_plaintext: Vec<u8> = "".to_string().as_bytes().to_vec();
