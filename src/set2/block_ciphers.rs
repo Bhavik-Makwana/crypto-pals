@@ -1,5 +1,6 @@
 extern crate aes;
 
+use crate::errors::pkcs7_padding_error::Pkcs7PaddingError;
 use crate::set2::aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use aes::cipher::generic_array::GenericArray;
 use aes::Aes128;
@@ -62,17 +63,20 @@ pub fn pkcs7(plaintext: &Vec<u8>, block_size: usize) -> Vec<u8> {
     plaintext.iter().chain(padding.iter()).cloned().collect()
 }
 
-pub fn pkcs7_remove(padded_plaintext: &Vec<u8>, block_size: usize) -> Result<Vec<u8>, String> {
+pub fn pkcs7_remove(
+    padded_plaintext: &Vec<u8>,
+    block_size: usize,
+) -> Result<Vec<u8>, Pkcs7PaddingError> {
     if is_pkcs7_padded(padded_plaintext, block_size)? {
         let padding_amount = padded_plaintext.last().unwrap();
         return Ok(padded_plaintext[0..padded_plaintext.len() - *padding_amount as usize].to_vec());
     }
-    Err("failed to remove padding".to_string())
+    Err(Pkcs7PaddingError::new("failed to remove padding"))
 }
 
-pub fn is_pkcs7_padded(plainbytes: &Vec<u8>, block_size: usize) -> Result<bool, String> {
+pub fn is_pkcs7_padded(plainbytes: &Vec<u8>, block_size: usize) -> Result<bool, Pkcs7PaddingError> {
     if plainbytes.len() % block_size != 0 {
-        return Err("inconsistent message length".to_string());
+        return Err(Pkcs7PaddingError::new("inconsistent message length"));
     }
     let last_char = plainbytes.last().unwrap();
     Ok(plainbytes
@@ -206,7 +210,7 @@ mod tests {
         let bytes = plaintext.as_bytes().to_vec();
         assert_eq!(
             is_pkcs7_padded(&bytes, 16),
-            Err("inconsistent message length".to_string())
+            Err(Pkcs7PaddingError::new("inconsistent message length"))
         );
     }
 }
