@@ -1,5 +1,7 @@
 use crate::set1::helper as set1_helper;
-use crate::set2::oracles::AesEcb128Oracle;
+use crate::set2::oracles::{
+    AesEcb128Oracle, AesEcb128OracleBuilder, IncompleteAesEcb128OracleBuild,
+};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 pub fn detect_ecb(ciphertext: &Vec<u8>) -> bool {
@@ -89,33 +91,32 @@ pub fn identify_payload_length(oracle: &AesEcb128Oracle) -> usize {
 mod tests {
     use super::*;
 
+    fn oracle() -> Result<AesEcb128Oracle, IncompleteAesEcb128OracleBuild> {
+        AesEcb128OracleBuilder::new()
+            .set_key("YELLOW SUBMARINE".to_string())
+            .set_prefix(None)
+            .set_target_bytes("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec())
+            .build()
+    }
+
     #[test]
-    fn identify_if_ecb_encryption() {
-        let oracle = AesEcb128Oracle {
-            key: "YELLOW SUBMARINE".to_string(),
-            prefix: None,
-            target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec(),
-        };
+    fn identify_if_ecb_encryption() -> Result<(), IncompleteAesEcb128OracleBuild> {
+        let oracle = oracle()?;
         assert_eq!(identify_if_ecb(&oracle), true);
+        Ok(())
     }
 
     #[test]
-    fn identify_length_of_payload() {
-        let oracle = AesEcb128Oracle {
-            key: "YELLOW SUBMARINE".to_string(),
-            prefix: None,
-            target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec(),
-        };
+    fn identify_length_of_payload() -> Result<(), IncompleteAesEcb128OracleBuild> {
+        let oracle = oracle()?;
         assert_eq!(identify_payload_length(&oracle), 139);
+        Ok(())
     }
 
     #[test]
-    fn identify_the_blocksize() {
-        let oracle = AesEcb128Oracle {
-            key: "YELLOW SUBMARINE".to_string(),
-            prefix: None,
-            target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec(),
-        };
+    fn identify_the_blocksize() -> Result<(), IncompleteAesEcb128OracleBuild> {
+        let oracle = oracle()?;
         assert_eq!(identify_blocksize(&oracle), 16);
+        Ok(())
     }
 }

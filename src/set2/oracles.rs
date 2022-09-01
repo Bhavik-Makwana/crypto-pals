@@ -2,13 +2,22 @@ use crate::set2::block_ciphers;
 use crate::set2::helper;
 extern crate url_escape;
 pub struct AesCbc128Oracle {
-    pub key: Vec<u8>,
-    pub prefix: Vec<u8>,
-    pub suffix: Vec<u8>,
-    pub iv: Vec<u8>,
+    key: Vec<u8>,
+    iv: Vec<u8>,
+    prefix: Vec<u8>,
+    suffix: Vec<u8>,
 }
 
 impl AesCbc128Oracle {
+    pub fn new(key: Vec<u8>, iv: Vec<u8>, prefix: Vec<u8>, suffix: Vec<u8>) -> Self {
+        AesCbc128Oracle {
+            key,
+            iv,
+            prefix,
+            suffix,
+        }
+    }
+
     fn escape_input(&self, plaintext: &str) -> String {
         let mut escaped_plaintext = plaintext.replace(";", "%3D");
         escaped_plaintext = escaped_plaintext.replace("=", "%3E");
@@ -45,12 +54,78 @@ impl AesCbc128Oracle {
 }
 
 pub struct AesEcb128Oracle {
-    pub key: String,
-    pub prefix: Option<Vec<u8>>,
-    pub target_bytes: Vec<u8>,
+    key: String,
+    prefix: Option<Vec<u8>>,
+    target_bytes: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub enum IncompleteAesEcb128OracleBuild {
+    NoKey,
+    NoPrefix,
+    NoTargetBytes,
+}
+
+pub struct AesEcb128OracleBuilder {
+    key: Option<String>,
+    prefix: Option<Option<Vec<u8>>>,
+    target_bytes: Option<Vec<u8>>,
+}
+
+impl AesEcb128OracleBuilder {
+    pub fn new() -> Self {
+        Self {
+            key: None,
+            prefix: None,
+            target_bytes: None,
+        }
+    }
+
+    pub fn set_key(&mut self, key: String) -> &mut Self {
+        self.key = Some(key);
+        self
+    }
+
+    pub fn set_prefix(&mut self, prefix: Option<Vec<u8>>) -> &mut Self {
+        self.prefix = Some(prefix);
+        self
+    }
+
+    pub fn set_target_bytes(&mut self, target_bytes: Vec<u8>) -> &mut Self {
+        self.target_bytes = Some(target_bytes);
+        self
+    }
+
+    pub fn build(&self) -> Result<AesEcb128Oracle, IncompleteAesEcb128OracleBuild> {
+        if let Some(key) = self.key.clone() {
+            if let Some(prefix) = self.prefix.clone() {
+                if let Some(target_bytes) = self.target_bytes.clone() {
+                    Ok(AesEcb128Oracle {
+                        key,
+                        prefix,
+                        target_bytes,
+                    })
+                } else {
+                    Err(IncompleteAesEcb128OracleBuild::NoTargetBytes)
+                }
+            } else {
+                Err(IncompleteAesEcb128OracleBuild::NoPrefix)
+            }
+        } else {
+            Err(IncompleteAesEcb128OracleBuild::NoKey)
+        }
+    }
 }
 
 impl AesEcb128Oracle {
+    pub fn new(key: String, prefix: Option<Vec<u8>>, target_bytes: Vec<u8>) -> Self {
+        AesEcb128Oracle {
+            key,
+            prefix,
+            target_bytes,
+        }
+    }
+
     pub fn encrypt(&self, plaintext: &Vec<u8>) -> Vec<u8> {
         if let Some(_) = self.prefix {
             return self.ecb_oracle_with_prefix(plaintext);
@@ -89,14 +164,14 @@ mod tests {
 
     #[test]
     fn cbc_oracle_works() {
-        let oracle = AesCbc128Oracle {
-            key: helper::random_aes_key().as_bytes().to_vec(),
-            iv: helper::random_iv(),
-            prefix: "comment1=cooking%20MCs;userdata=".as_bytes().to_vec(),
-            suffix: ";comment2=%20like%20a%20pound%20of%20bacon"
+        let oracle = AesCbc128Oracle::new(
+            helper::random_aes_key().as_bytes().to_vec(),
+            helper::random_iv(),
+            "comment1=cooking%20MCs;userdata=".as_bytes().to_vec(),
+            ";comment2=%20like%20a%20pound%20of%20bacon"
                 .as_bytes()
                 .to_vec(),
-        };
+        );
         let input = ";admin=true";
         let ciphertext = oracle.encrypt(&input);
         assert_eq!(oracle.decrypt_and_check_admin(&ciphertext), false);

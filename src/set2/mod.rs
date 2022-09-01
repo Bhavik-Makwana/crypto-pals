@@ -1,10 +1,10 @@
 extern crate aes;
 pub mod block_ciphers;
 pub mod helper;
-pub mod profile;
 pub mod oracles;
+pub mod profile;
 
-use oracles::AesEcb128Oracle;
+use oracles::{AesEcb128Oracle, AesEcb128OracleBuilder};
 use profile::Profile;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -75,11 +75,11 @@ fn break_ecb_byte(oracle: &AesEcb128Oracle, plaintext: &Vec<u8>, block_size: i32
 }
 
 pub fn break_ecb() -> String {
-    let oracle = AesEcb128Oracle { 
-        key: "YELLOW SUBMARINE".to_string(), 
-        prefix: None, 
-        target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec()
-    };
+    let oracle = AesEcb128OracleBuilder::new()
+        .set_key("YELLOW SUBMARINE".to_string())
+        .set_prefix(None)
+        .set_target_bytes("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec())
+        .build().unwrap();
 
     let secret_message_length = helper::identify_payload_length(&oracle);
     let block_size = helper::identify_blocksize(&oracle);
@@ -123,17 +123,10 @@ pub fn cut_and_paste_ecb(p: &Profile) -> Vec<u8> {
     manipulated_profile
 }
 
-
-
 pub fn identify_prefix_size(oracle: &AesEcb128Oracle) -> usize {
     let mut plainbytes = vec!['A' as u8; 1];
     let mut curr: Vec<u8>;
-    let mut prev = oracle
-        .encrypt(&vec![])
-        .iter()
-        .take(16)
-        .cloned()
-        .collect();
+    let mut prev = oracle.encrypt(&vec![]).iter().take(16).cloned().collect();
     for i in 0..16 {
         curr = oracle
             .encrypt(&plainbytes)
@@ -179,11 +172,11 @@ fn break_ecb_byte_prefix(
 }
 
 pub fn byte_at_a_time_ecb_decryption() -> String {
-    let oracle = AesEcb128Oracle {
-        key: "YELLOW SUBMARINE".to_string(),
-        prefix: Some(helper::random_bytes()),
-        target_bytes: "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec(),
-    };
+    let oracle = AesEcb128OracleBuilder::new()
+        .set_key("YELLOW SUBMARINE".to_string())
+        .set_prefix(Some(helper::random_bytes()))
+        .set_target_bytes("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK".as_bytes().to_vec())
+        .build().unwrap();
     let secret_message_length = helper::identify_payload_length(&oracle);
     let block_size = helper::identify_blocksize(&oracle);
     let padding_size = identify_prefix_size(&oracle);
@@ -213,7 +206,6 @@ pub fn bitflip_cbc(oracle: &oracles::AesCbc128Oracle, message: &str) -> Vec<u8> 
     let message_bytes = message.as_bytes().to_vec();
     let payload: String = (0..message.len()).map(|_| 'A').collect();
     let payload_bytes = payload.as_bytes().to_vec();
-    
     let flipped_bytes: Vec<_> = xor_vec(&message_bytes, &payload_bytes);
     let ciphertext = oracle.encrypt(&payload);
 
@@ -221,11 +213,16 @@ pub fn bitflip_cbc(oracle: &oracles::AesCbc128Oracle, message: &str) -> Vec<u8> 
 }
 
 // modifying block before are we want plaintext to be effected (block 2)
-    // pad to maintain a consistent length
+// pad to maintain a consistent length
 fn xor_vec_zero_padding(a: &Vec<u8>, b: &Vec<u8>, prefix_len: usize) -> Vec<u8> {
     let prefix_padding: Vec<u8> = vec![0 as u8; prefix_len];
-    let suffix_padding = vec![0 as u8; a.len()-prefix_padding.len()];
-    let padded_b: Vec<u8> = prefix_padding.iter().chain(b.iter()).chain(suffix_padding.iter()).cloned().collect();
+    let suffix_padding = vec![0 as u8; a.len() - prefix_padding.len()];
+    let padded_b: Vec<u8> = prefix_padding
+        .iter()
+        .chain(b.iter())
+        .chain(suffix_padding.iter())
+        .cloned()
+        .collect();
     a.iter().zip(padded_b.iter()).map(|(x, y)| x ^ y).collect()
 }
 
@@ -241,14 +238,14 @@ mod tests {
 
     #[test]
     fn challenge_fifteen() {
-        let oracle = oracles::AesCbc128Oracle {
-            key: helper::random_aes_key().as_bytes().to_vec(),
-            iv: helper::random_iv(),
-            prefix: "comment1=cooking%20MCs;userdata=".as_bytes().to_vec(),
-            suffix: ";comment2=%20like%20a%20pound%20of%20bacon"
+        let oracle = oracles::AesCbc128Oracle::new(
+            helper::random_aes_key().as_bytes().to_vec(),
+            helper::random_iv(),
+            "comment1=cooking%20MCs;userdata=".as_bytes().to_vec(),
+            ";comment2=%20like%20a%20pound%20of%20bacon"
                 .as_bytes()
                 .to_vec(),
-        };
+        );
         // luckily the prefix is 2 blocks long so we don't need to worry about padding the input
         let result = bitflip_cbc(&oracle, ";admin=true");
         assert_eq!(oracle.decrypt_and_check_admin(&result), true);
