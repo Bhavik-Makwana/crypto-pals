@@ -24,6 +24,10 @@ pub fn random_padding() -> String {
         .collect()
 }
 
+pub fn random_iv() -> Vec<u8> {
+    thread_rng().sample_iter(&Alphanumeric).take(16).collect()
+}
+
 pub fn random_bytes() -> Vec<u8> {
     let mut rng = thread_rng();
     thread_rng()

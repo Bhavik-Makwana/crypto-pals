@@ -208,10 +208,61 @@ pub fn byte_at_a_time_ecb_decryption() -> String {
     String::from_utf8_lossy(&known_plaintext).to_string()
 }
 
+// challenge 15
+pub fn bitflip_cbc(oracle: &oracles::AesCbc128Oracle) -> Vec<u8> {
+    let message = ";admin=true";
+    let message_bytes = message.as_bytes().to_vec();
+    let payload: String = (0..message.len()).map(|_| 'A').collect();
+    let bits = payload.as_bytes().to_vec();
+    
+    
+    let pad: Vec<_> = xor_vec(&message_bytes, &bits);
+    
+    
+    let ciphertext = oracle.encrypt(&payload);
+
+    
+    let x: Vec<u8> = (0..16).map(|_| 0 as u8).collect();
+    println!("ct: {} x: {} pad: {}", ciphertext.len(), x.len(), pad.len());
+    let p: Vec<u8> = x.iter().chain(pad.iter()).cloned().collect();
+    let z: Vec<u8> = (0..ciphertext.len()-p.len()).map(|_| 0 as u8).collect();
+    let q = p.iter().chain(z.iter()).cloned().collect();
+    println!("aaa");
+    
+    let flipped_ct = xor_vec(&ciphertext, &q);
+    println!("flipped {}", flipped_ct.len());
+    
+    flipped_ct
+}
+
+fn xor_vec(a: &Vec<u8>, b: &Vec<u8>) -> Vec<u8> {
+    a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::set1;
+    use crate::set2::oracles;
+
+    #[test]
+    fn challenge_fifteen() {
+        let oracle = oracles::AesCbc128Oracle {
+            key: helper::random_aes_key().as_bytes().to_vec(),
+            iv: helper::random_iv(),
+            prefix: "comment1=cooking%20MCs;userdata=".as_bytes().to_vec(),
+            suffix: ";comment2=%20like%20a%20pound%20of%20bacon"
+                .as_bytes()
+                .to_vec(),
+        };
+        let result = bitflip_cbc(&oracle);
+        // let decrypted = oracle.decrypt(&result);
+        // let res = String::from_utf8_lossy(&decrypted);
+        // println!("decrypted {}", res);
+        // println!("{}", String::from_utf8_lossy(&result));
+        // assert_eq!(res, "test");
+        assert_eq!(oracle.decrypt_and_check_admin(&result), true);
+    }
 
     #[test]
     fn challenge_fourteen() {
