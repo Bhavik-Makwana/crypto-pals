@@ -209,30 +209,24 @@ pub fn byte_at_a_time_ecb_decryption() -> String {
 }
 
 // challenge 15
-pub fn bitflip_cbc(oracle: &oracles::AesCbc128Oracle) -> Vec<u8> {
-    let message = ";admin=true";
+pub fn bitflip_cbc(oracle: &oracles::AesCbc128Oracle, message: &str) -> Vec<u8> {
     let message_bytes = message.as_bytes().to_vec();
     let payload: String = (0..message.len()).map(|_| 'A').collect();
-    let bits = payload.as_bytes().to_vec();
+    let payload_bytes = payload.as_bytes().to_vec();
     
-    
-    let pad: Vec<_> = xor_vec(&message_bytes, &bits);
-    
-    
+    let flipped_bytes: Vec<_> = xor_vec(&message_bytes, &payload_bytes);
     let ciphertext = oracle.encrypt(&payload);
 
-    
-    let x: Vec<u8> = (0..16).map(|_| 0 as u8).collect();
-    println!("ct: {} x: {} pad: {}", ciphertext.len(), x.len(), pad.len());
-    let p: Vec<u8> = x.iter().chain(pad.iter()).cloned().collect();
-    let z: Vec<u8> = (0..ciphertext.len()-p.len()).map(|_| 0 as u8).collect();
-    let q = p.iter().chain(z.iter()).cloned().collect();
-    println!("aaa");
-    
-    let flipped_ct = xor_vec(&ciphertext, &q);
-    println!("flipped {}", flipped_ct.len());
-    
-    flipped_ct
+    xor_vec_zero_padding(&ciphertext, &flipped_bytes, 16)
+}
+
+// modifying block before are we want plaintext to be effected (block 2)
+    // pad to maintain a consistent length
+fn xor_vec_zero_padding(a: &Vec<u8>, b: &Vec<u8>, prefix_len: usize) -> Vec<u8> {
+    let prefix_padding: Vec<u8> = vec![0 as u8; prefix_len];
+    let suffix_padding = vec![0 as u8; a.len()-prefix_padding.len()];
+    let padded_b: Vec<u8> = prefix_padding.iter().chain(b.iter()).chain(suffix_padding.iter()).cloned().collect();
+    a.iter().zip(padded_b.iter()).map(|(x, y)| x ^ y).collect()
 }
 
 fn xor_vec(a: &Vec<u8>, b: &Vec<u8>) -> Vec<u8> {
@@ -255,12 +249,8 @@ mod tests {
                 .as_bytes()
                 .to_vec(),
         };
-        let result = bitflip_cbc(&oracle);
-        // let decrypted = oracle.decrypt(&result);
-        // let res = String::from_utf8_lossy(&decrypted);
-        // println!("decrypted {}", res);
-        // println!("{}", String::from_utf8_lossy(&result));
-        // assert_eq!(res, "test");
+        // luckily the prefix is 2 blocks long so we don't need to worry about padding the input
+        let result = bitflip_cbc(&oracle, ";admin=true");
         assert_eq!(oracle.decrypt_and_check_admin(&result), true);
     }
 

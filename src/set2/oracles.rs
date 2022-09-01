@@ -9,9 +9,14 @@ pub struct AesCbc128Oracle {
 }
 
 impl AesCbc128Oracle {
-    pub fn encrypt(&self, plaintext: &str) -> Vec<u8> {
+    fn escape_input(&self, plaintext: &str) -> String {
         let mut escaped_plaintext = plaintext.replace(";", "%3D");
         escaped_plaintext = escaped_plaintext.replace("=", "%3E");
+        escaped_plaintext
+    }
+
+    pub fn encrypt(&self, plaintext: &str) -> Vec<u8> {
+        let escaped_plaintext = self.escape_input(plaintext);
         let bytes = escaped_plaintext.as_bytes().to_vec();
         let message: Vec<u8> = self
             .prefix
